@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, status, Header
 from fastapi.security import OAuth2PasswordBearer
 from pymongo import MongoClient
+from pymongo.server_api import ServerApi
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -23,11 +24,11 @@ load_dotenv()
 app = FastAPI()
 
 # MongoDB Configuration
-MONGO_URI = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
+MONGO_URI = os.getenv('MONGO_URI' )
 DB_NAME = "OMG"
 
 try:
-    client = MongoClient(MONGO_URI)
+    client = MongoClient(MONGO_URI, server_api=ServerApi('1'))
     client.admin.command('ping')
     logger.info("✅ MongoDB connection successful")
     db = client[DB_NAME]
