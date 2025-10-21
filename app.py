@@ -154,6 +154,7 @@ class GameResponse(BaseModel):
     bundle_url: str
     category_names: List[str]
     image_url: str
+    LastUpdate: Optional[str] = None
 
 @router.get("/games", response_model=List[GameResponse])
 async def get_all_games():
@@ -173,7 +174,8 @@ async def get_all_games():
             "name": 1,      # Include game name
             "bundle_url": 1,# Include bundle URL
             "category_names": 1,  # Include categories
-            "image_url": 1  # Include image URL
+            "image_url": 1,
+            "LastUpdate": 1 
         }))
         
         return games
