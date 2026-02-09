@@ -188,12 +188,12 @@ async def get_all_games():
         )
 
 
-
+#test
 
 # addinga new user
 class CreateUserRequest(BaseModel):
     username: str
-    
+
 @app.post("/api/user/create")
 def create_user(data: CreateUserRequest):
     if not data.username.strip():
