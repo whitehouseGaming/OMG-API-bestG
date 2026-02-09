@@ -187,9 +187,36 @@ async def get_all_games():
             detail="Failed to retrieve games. Please try again later."
         )
 
+
+
+
+# addinga new user
+class CreateUserRequest(BaseModel):
+    username: str
+    
+@app.post("/api/user/create")
+def create_user(data: CreateUserRequest):
+    if not data.username.strip():
+        raise HTTPException(400, "Username required")
+
+    user = {
+        "username": data.username.strip(),
+        "createdAt": datetime.utcnow(),
+        "isGuest": True
+    }
+
+    result = db.users.insert_one(user)
+
+    return {
+        "status": True,
+        "userId": str(result.inserted_id),
+        "username": data.username
+    }
+
 # Include the router
 app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
