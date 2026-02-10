@@ -213,6 +213,156 @@ def create_user(data: CreateUserRequest):
         "username": data.username
     }
 
+
+@app.post("/api/world-record/submit")
+def submit_world_record(payload: dict):
+    """
+    payload = {
+        userId: str,
+        gameId: str,
+        score: int
+    }
+    """
+
+    user_id = ObjectId(payload["userId"])
+    game_id = ObjectId(payload["gameId"])
+    score = int(payload["score"])
+
+    record = db.world_records.find_one({"gameId": game_id})
+
+    # No record yet OR new score beats world record
+    if not record or score > record["score"]:
+        db.world_records.update_one(
+            {"gameId": game_id},
+            {
+                "$set": {
+                    "userId": user_id,
+                    "score": score,
+                    "updatedAt": datetime.utcnow()
+                }
+            },
+            upsert=True
+        )
+
+        return {
+            "status": True,
+            "newWorldRecord": True
+        }
+
+    return {
+        "status": True,
+        "newWorldRecord": False
+    }
+
+# tournament
+
+@app.post("/api/tournament/submit")
+def submit_tournament_score(payload: dict):
+    """
+    payload = {
+        tournamentId: str,
+        userId: str,
+        username: str,
+        score: int
+    }
+    """
+
+    tournament_id = ObjectId(payload["tournamentId"])
+    user_id = ObjectId(payload["userId"])
+    username = payload["username"]
+    score = int(payload["score"])
+
+    # Get current top 50
+    scores = list(
+        db.tournament_scores
+        .find({"tournamentId": tournament_id})
+        .sort("score", -1)
+    )
+
+    # Check if user already exists
+    existing = next((s for s in scores if s["userId"] == user_id), None)
+
+    if existing:
+        if score > existing["score"]:
+            db.tournament_scores.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"score": score}}
+            )
+        return {"status": True}
+
+    # If leaderboard not full OR score beats lowest in top 50
+    if len(scores) < 50 or score > scores[-1]["score"]:
+        db.tournament_scores.insert_one({
+            "tournamentId": tournament_id,
+            "userId": user_id,
+            "username": username,
+            "score": score
+        })
+
+        # Trim to top 50
+        overflow = (
+            db.tournament_scores
+            .find({"tournamentId": tournament_id})
+            .sort("score", -1)
+            .skip(50)
+        )
+
+        ids_to_delete = [doc["_id"] for doc in overflow]
+        if ids_to_delete:
+            db.tournament_scores.delete_many({"_id": {"$in": ids_to_delete}})
+
+        return {"status": True, "qualified": True}
+
+    return {
+        "status": True,
+        "qualified": False,
+        "approxRank": ">50"
+    }
+@app.get("/api/tournament/data")
+def get_tournament_data():
+    tournaments = list(db.tournaments.find())
+
+    response = {
+        "current": None,
+        "last": None
+    }
+
+    for t in tournaments:
+        leaderboard = list(
+            db.tournament_scores
+            .find({"tournamentId": t["_id"]})
+            .sort("score", -1)
+            .limit(50)
+        )
+
+        leaderboard_data = [
+            {
+                "rank": i + 1,
+                "username": s["username"],
+                "score": s["score"]
+            }
+            for i, s in enumerate(leaderboard)
+        ]
+
+        data = {
+            "tournamentId": str(t["_id"]),
+            "tournamentName": t["name"],
+            "gameName": t["gameName"],
+            "prizes": t["prizes"],
+            "leaderboard": leaderboard_data
+        }
+
+        if t["weekType"] == "current":
+            response["current"] = data
+        elif t["weekType"] == "last":
+            response["last"] = data
+
+    return {
+        "status": True,
+        "data": response
+    }
+
+
 # Include the router
 app.include_router(router)
 
