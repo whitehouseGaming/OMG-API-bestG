@@ -256,111 +256,46 @@ def submit_world_record(payload: dict):
 
 # tournament
 
-@app.post("/api/tournament/submit")
-def submit_tournament_score(payload: dict):
-    """
-    payload = {
-        tournamentId: str,
-        userId: str,
-        username: str,
-        score: int
-    }
-    """
+@app.post("/api/world-record/submit")
+def submit_world_record(payload: dict):
 
-    tournament_id = ObjectId(payload["tournamentId"])
-    user_id = ObjectId(payload["userId"])
-    username = payload["username"]
-    score = int(payload["score"])
+    try:
+        user_id = payload["userId"]
+        game_id = payload["gameId"]
+        score = int(payload["score"])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid input")
 
-    # Get current top 50
-    scores = list(
-        db.tournament_scores
-        .find({"tournamentId": tournament_id})
-        .sort("score", -1)
-    )
+    record = db.world_records.find_one({"gameId": game_id})
 
-    # Check if user already exists
-    existing = next((s for s in scores if s["userId"] == user_id), None)
-
-    if existing:
-        if score > existing["score"]:
-            db.tournament_scores.update_one(
-                {"_id": existing["_id"]},
-                {"$set": {"score": score}}
-            )
-        return {"status": True}
-
-    # If leaderboard not full OR score beats lowest in top 50
-    if len(scores) < 50 or score > scores[-1]["score"]:
-        db.tournament_scores.insert_one({
-            "tournamentId": tournament_id,
+    # If no record exists → create new
+    if not record:
+        db.world_records.insert_one({
+            "gameId": game_id,
             "userId": user_id,
-            "username": username,
-            "score": score
+            "score": score,
+            "updatedAt": datetime.utcnow()
         })
 
-        # Trim to top 50
-        overflow = (
-            db.tournament_scores
-            .find({"tournamentId": tournament_id})
-            .sort("score", -1)
-            .skip(50)
-        )
+        return {"status": True, "newWorldRecord": True}
 
-        ids_to_delete = [doc["_id"] for doc in overflow]
-        if ids_to_delete:
-            db.tournament_scores.delete_many({"_id": {"$in": ids_to_delete}})
-
-        return {"status": True, "qualified": True}
-
-    return {
-        "status": True,
-        "qualified": False,
-        "approxRank": ">50"
-    }
-@app.get("/api/tournament/data")
-def get_tournament_data():
-    tournaments = list(db.tournaments.find())
-
-    response = {
-        "current": None,
-        "last": None
-    }
-
-    for t in tournaments:
-        leaderboard = list(
-            db.tournament_scores
-            .find({"tournamentId": t["_id"]})
-            .sort("score", -1)
-            .limit(50)
-        )
-
-        leaderboard_data = [
+    # If score is higher → update
+    if score > record["score"]:
+        db.world_records.update_one(
+            {"gameId": game_id},
             {
-                "rank": i + 1,
-                "username": s["username"],
-                "score": s["score"]
+                "$set": {
+                    "userId": user_id,
+                    "score": score,
+                    "updatedAt": datetime.utcnow()
+                }
             }
-            for i, s in enumerate(leaderboard)
-        ]
+        )
 
-        data = {
-            "tournamentId": str(t["_id"]),
-            "tournamentName": t["name"],
-            "gameName": t["gameName"],
-            "prizes": t["prizes"],
-            "leaderboard": leaderboard_data
-        }
+        return {"status": True, "newWorldRecord": True}
 
-        if t["weekType"] == "current":
-            response["current"] = data
-        elif t["weekType"] == "last":
-            response["last"] = data
-
-    return {
-        "status": True,
-        "data": response
-    }
+    # Otherwise → no update
+    return {"status": True, "newWorldRecord": False}
 
 @app.get("/api/world-records")
 def get_all_world_records():
