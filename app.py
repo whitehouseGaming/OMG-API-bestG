@@ -362,6 +362,20 @@ def get_tournament_data():
         "data": response
     }
 
+@app.get("/api/world-records")
+def get_all_world_records():
+    records = list(
+        db.world_records.find({}, {
+            "_id": 0,
+            "gameId": 1,
+            "score": 1
+        })
+    )
+
+    return {
+        "status": True,
+        "data": records
+    }
 
 # Include the router
 app.include_router(router)
