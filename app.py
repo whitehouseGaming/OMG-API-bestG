@@ -216,22 +216,28 @@ def create_user(data: CreateUserRequest):
 
 @app.post("/api/world-record/submit")
 def submit_world_record(payload: dict):
-    """
-    payload = {
-        userId: str,
-        gameId: str,
-        score: int
-    }
-    """
 
-    user_id = ObjectId(payload["userId"])
-    game_id = ObjectId(payload["gameId"])
-    score = int(payload["score"])
+    try:
+        user_id = payload["userId"]
+        game_id = payload["gameId"]
+        score = int(payload["score"])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid input")
 
     record = db.world_records.find_one({"gameId": game_id})
 
-    # No record yet OR new score beats world record
-    if not record or score > record["score"]:
+    # If no record → create
+    if not record:
+        db.world_records.insert_one({
+            "gameId": game_id,
+            "userId": user_id,
+            "score": score,
+            "updatedAt": datetime.utcnow()
+        })
+        return {"status": True, "newWorldRecord": True}
+
+    # If higher score → update
+    if score > record["score"]:
         db.world_records.update_one(
             {"gameId": game_id},
             {
@@ -240,19 +246,11 @@ def submit_world_record(payload: dict):
                     "score": score,
                     "updatedAt": datetime.utcnow()
                 }
-            },
-            upsert=True
+            }
         )
+        return {"status": True, "newWorldRecord": True}
 
-        return {
-            "status": True,
-            "newWorldRecord": True
-        }
-
-    return {
-        "status": True,
-        "newWorldRecord": False
-    }
+    return {"status": True, "newWorldRecord": False}
 
 # tournament
 
