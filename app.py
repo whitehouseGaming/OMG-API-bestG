@@ -310,6 +310,110 @@ def get_all_world_records():
         "data": records
     }
 
+@app.get("/api/tournament/{tournament_id}/leaderboard")
+def get_leaderboard(tournament_id: str):
+
+    scores = list(
+        db.tournament_scores
+        .find({"tournamentId": tournament_id}, {"_id": 0})
+        .sort("score", -1)
+        .limit(50)
+    )
+
+    return {
+        "status": True,
+        "data": scores
+    }
+@app.post("/api/tournament/submit-score")
+def submit_tournament_score(payload: dict):
+
+    tournament_id = payload["tournamentId"]
+    user_id = payload["userId"]
+    username = payload["username"]
+    score = int(payload["score"])
+
+    # Check if user already in leaderboard
+    existing = db.tournament_scores.find_one({
+        "tournamentId": tournament_id,
+        "userId": user_id
+    })
+
+    # If user already exists → update if higher
+    if existing:
+        if score > existing["score"]:
+            db.tournament_scores.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"score": score}}
+            )
+        return {"status": True}
+
+    # Count how many currently stored
+    count = db.tournament_scores.count_documents({
+        "tournamentId": tournament_id
+    })
+
+    # If less than 50 → just insert
+    if count < 50:
+        db.tournament_scores.insert_one({
+            "tournamentId": tournament_id,
+            "userId": user_id,
+            "username": username,
+            "score": score,
+            "createdAt": datetime.utcnow()
+        })
+        return {"status": True}
+
+    # Already 50 → find lowest score
+    lowest = db.tournament_scores.find(
+        {"tournamentId": tournament_id}
+    ).sort("score", 1).limit(1)
+
+    lowest = list(lowest)[0]
+
+    # If new score is better than lowest
+    if score > lowest["score"]:
+
+        # Delete lowest
+        db.tournament_scores.delete_one({"_id": lowest["_id"]})
+
+        # Insert new
+        db.tournament_scores.insert_one({
+            "tournamentId": tournament_id,
+            "userId": user_id,
+            "username": username,
+            "score": score,
+            "createdAt": datetime.utcnow()
+        })
+
+        return {"status": True, "enteredLeaderboard": True}
+
+    # Not good enough
+    return {
+        "status": False,
+        "message": "Score not high enough for Top 50"
+    }
+
+@app.get("/api/tournaments")
+def get_tournaments():
+
+    tournaments = list(db.tournaments.find({}))
+
+    formatted = []
+
+    for t in tournaments:
+        formatted.append({
+            "tournamentId": str(t["_id"]),  # convert ObjectId → string
+            "name": t.get("name"),
+            "gameName": t.get("gameName"),
+            "prizes": t.get("prizes", []),
+            "weekType": t.get("weekType")
+        })
+
+    return {
+        "status": True,
+        "data": formatted
+    }
+
 # Include the router
 app.include_router(router)
 
