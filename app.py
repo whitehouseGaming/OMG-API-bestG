@@ -396,7 +396,7 @@ def submit_tournament_score(payload: dict):
 @app.get("/api/tournaments")
 def get_tournaments():
 
-    tournaments = list(db.tournaments.find({}))
+    tournaments = list(db.tournament.find({}))
 
     formatted = []
 
