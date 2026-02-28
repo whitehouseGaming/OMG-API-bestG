@@ -393,20 +393,20 @@ def submit_tournament_score(payload: dict):
         "message": "Score not high enough for Top 50"
     }
 
-@app.get("/api/tournaments")
+@router.get("/api/tournaments")
 def get_tournaments():
-
     tournaments = list(db.tournament.find({}))
 
     formatted = []
 
     for t in tournaments:
         formatted.append({
-            "tournamentId": str(t["_id"]),  # convert ObjectId → string
-            "name": t.get("name"),
-            "gameName": t.get("gameName"),
+            "tournamentId": str(t.get("_id")),
+            "name": t.get("name", ""),
+            "gameName": t.get("gameName", ""),
             "prizes": t.get("prizes", []),
-            "weekType": t.get("weekType")
+            "endDate": t.get("endDate").isoformat() if t.get("endDate") else None,
+            "activeTourni": t.get("activeTourni", False)
         })
 
     return {
