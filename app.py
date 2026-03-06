@@ -310,14 +310,11 @@ def get_all_world_records():
         "data": records
     }
 
-@app.get("/api/tournament/{tournament_id}/leaderboard")
-def get_leaderboard(tournament_id: str):
+@app.get("/api/tournament/leaderboard")
+def get_leaderboard():
 
     scores = list(
-        db.tournament_scores
-        .find({"tournamentId": tournament_id}, {"_id": 0})
-        .sort("score", -1)
-        .limit(50)
+        db.tournament_scores.find({}, {"_id": 0})
     )
 
     return {
