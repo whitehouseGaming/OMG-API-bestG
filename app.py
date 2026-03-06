@@ -319,7 +319,7 @@ def get_leaderboard():
 
     return {
         "status": True,
-        "data": scores
+        "LeaderBoardData": scores
     }
 @app.post("/api/tournament/submit-score")
 def submit_tournament_score(payload: dict):
